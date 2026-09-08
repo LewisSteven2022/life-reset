@@ -15,9 +15,9 @@ async function shot(page: Page, name: string) {
   await page.screenshot({ path: `${SCREENSHOT_DIR}/${name}.png`, fullPage: true });
 }
 
-function pathOf(url: string): string {
+function pathOf(url: string | URL): string {
   try {
-    return new URL(url).pathname;
+    return (url instanceof URL ? url : new URL(url)).pathname;
   } catch {
     return '';
   }
@@ -47,6 +47,18 @@ async function confirmFromInbox(page: Page, inbox: Inbox) {
   await signIn(page);
 }
 
+async function finishAuth(page: Page, inbox: Inbox | null) {
+  try {
+    await signIn(page);
+    writeFileSync('/tmp/life-reset-qa-email.txt', email);
+    return;
+  } catch (err) {
+    if (!inbox) throw err;
+  }
+  await confirmFromInbox(page, inbox);
+  writeFileSync('/tmp/life-reset-qa-email.txt', email);
+}
+
 async function signUp(page: Page) {
   const fromEnv = process.env.PLAYWRIGHT_TEST_EMAIL?.trim();
   let inbox: Inbox | null = null;
@@ -71,23 +83,17 @@ async function signUp(page: Page) {
       error.waitFor({ state: 'visible', timeout: 30_000 }).then(async () => (await error.innerText()).trim()),
     ]).catch(() => 'timeout');
 
-    if (outcome === 'ok') {
+    const path = pathOf(page.url());
+    if (outcome === 'ok' || path === '/app/setup') {
       writeFileSync('/tmp/life-reset-qa-email.txt', email);
       return;
     }
-    if (outcome === 'unconfirmed') {
-      if (!inbox) {
-        throw new Error(
-          `Sign up for ${email} reached /login — Confirm email is still ON and no inbox is available to confirm it.`,
-        );
-      }
-      await confirmFromInbox(page, inbox);
-      writeFileSync('/tmp/life-reset-qa-email.txt', email);
+    if (outcome === 'unconfirmed' || path === '/login' || path === '/app') {
+      await finishAuth(page, inbox);
       return;
     }
     if (typeof outcome === 'string' && /already registered|already been registered/i.test(outcome)) {
-      await signIn(page);
-      writeFileSync('/tmp/life-reset-qa-email.txt', email);
+      await finishAuth(page, inbox);
       return;
     }
     if (typeof outcome === 'string' && /rate limit/i.test(outcome)) {
@@ -95,7 +101,7 @@ async function signUp(page: Page) {
       await page.waitForTimeout(waitMs);
       continue;
     }
-    throw new Error(`Sign up failed for ${email}: ${outcome}`);
+    throw new Error(`Sign up failed for ${email}: ${outcome} (path ${path})`);
   }
   throw new Error('Sign up exhausted retries (email rate limit)');
 }
