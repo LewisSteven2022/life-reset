@@ -47,6 +47,7 @@ export function AreasStep({
                     name="areaKey"
                     value={area.key}
                     checked={isPicked}
+                    aria-label={area.name}
                     onChange={(e) =>
                       setPicked((prev) => (e.target.checked ? [...prev, area.key] : prev.filter((k) => k !== area.key)))
                     }

@@ -65,9 +65,9 @@ test.describe('core journey', () => {
     await expect(page).toHaveURL(/\/app\/setup/);
     await expect(page.getByRole('heading', { name: /Where does your reset start/i })).toBeVisible();
 
-    await page.getByText('Sleep', { exact: true }).click();
-    await page.getByText('Fitness', { exact: true }).click();
-    await page.getByText('Money basics', { exact: true }).click();
+    await page.getByRole('checkbox', { name: /Sleep/ }).check();
+    await page.getByRole('checkbox', { name: /Fitness/ }).check();
+    await page.getByRole('checkbox', { name: /Money basics/ }).check();
     await page.getByPlaceholder('e.g. Guitar practice').fill('Guitar practice');
     await page.getByRole('button', { name: 'Add your own area' }).click();
     await expect(page.getByText('Your area: Guitar practice')).toBeVisible();
