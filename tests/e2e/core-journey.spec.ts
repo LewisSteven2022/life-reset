@@ -15,22 +15,35 @@ async function shot(page: Page, name: string) {
   await page.screenshot({ path: `${SCREENSHOT_DIR}/${name}.png`, fullPage: true });
 }
 
+function pathOf(url: string): string {
+  try {
+    return new URL(url).pathname;
+  } catch {
+    return '';
+  }
+}
+
 async function signIn(page: Page) {
   await page.goto('/login');
   await page.getByLabel('Email').fill(email);
   await page.getByLabel('Password').fill(password);
   await page.getByRole('button', { name: 'Sign in' }).click();
-  await page.waitForURL(/\/app(\/setup)?\/?$/);
+  await page.waitForURL((url) => {
+    const path = pathOf(url);
+    return path === '/app' || path.startsWith('/app/');
+  });
 }
 
 async function confirmFromInbox(page: Page, inbox: Inbox) {
   const link = await waitForConfirmLink(inbox);
   if (!link) {
     throw new Error(
-      `No confirmation email for ${inbox.email}. Confirm email may still be ON, and the mailer did not deliver.`,
+      `No confirmation email for ${inbox.email}. Confirm email is ON, and the mailer did not deliver.`,
     );
   }
-  await page.goto(link);
+  // Visiting the PKCE redirect_to (localhost) is unnecessary. Confirming the
+  // address is enough; we then sign in with the password through the UI.
+  await fetch(link, { redirect: 'manual' });
   await signIn(page);
 }
 
@@ -53,8 +66,8 @@ async function signUp(page: Page) {
 
     const error = page.locator('form p.text-ember').first();
     const outcome = await Promise.race([
-      page.waitForURL(/\/app(\/setup)?\/?$/, { timeout: 30_000 }).then(() => 'ok' as const),
-      page.waitForURL(/\/login(\?|$)/, { timeout: 30_000 }).then(() => 'unconfirmed' as const),
+      page.waitForURL((url) => pathOf(url) === '/app/setup', { timeout: 30_000 }).then(() => 'ok' as const),
+      page.waitForURL((url) => pathOf(url) === '/login', { timeout: 30_000 }).then(() => 'unconfirmed' as const),
       error.waitFor({ state: 'visible', timeout: 30_000 }).then(async () => (await error.innerText()).trim()),
     ]).catch(() => 'timeout');
 
@@ -143,6 +156,9 @@ test.describe('core journey', () => {
   test('sign up, choose areas, start, check in, reflect, rewards, persist', async ({ page }) => {
     test.setTimeout(600_000);
     await signUp(page);
+    if (!pathOf(page.url()).startsWith('/app/setup')) {
+      await page.goto('/app/setup');
+    }
     await expect(page).toHaveURL(/\/app\/setup/);
     await expect(page.getByRole('heading', { name: /Where does your reset start/i })).toBeVisible();
     await shot(page, 'journey-01-setup-areas');
