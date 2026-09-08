@@ -44,7 +44,7 @@ async function signUp(page: Page) {
     email = inbox.email;
   }
 
-  for (let attempt = 0; attempt < 10; attempt += 1) {
+  for (let attempt = 0; attempt < 4; attempt += 1) {
     await page.goto('/signup');
     await page.getByLabel('Email').fill(email);
     await expect(page.getByLabel('Email')).toHaveValue(email);
@@ -78,7 +78,7 @@ async function signUp(page: Page) {
       return;
     }
     if (typeof outcome === 'string' && /rate limit/i.test(outcome)) {
-      const waitMs = Math.min(120_000, 30_000 * (attempt + 1));
+      const waitMs = 20_000 * (attempt + 1);
       await page.waitForTimeout(waitMs);
       continue;
     }
