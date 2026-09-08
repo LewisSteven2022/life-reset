@@ -6,10 +6,15 @@ import { AreasStep } from './areas-step';
 import { PlanStep } from './plan-step';
 import { GeneratePlanForm } from './generate-plan-form';
 
-export default async function SetupPage() {
+export default async function SetupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
   const programme = await getOpenProgramme();
   if (programme?.status === 'active') redirect('/app');
 
+  const ready = (await searchParams).ready === '1';
   const [catalogue, areas] = await Promise.all([listAreaCatalogue(), listUserAreas()]);
   const habits = programme ? await listProgrammeHabits(programme.id) : [];
 
@@ -17,7 +22,9 @@ export default async function SetupPage() {
     return <PlanStep programmeId={programme.id} habits={habits} />;
   }
 
-  if (programme && areas.length > 0) {
+  // Custom areas are added on the picker. Do not skip that screen until the
+  // user confirms with "Build my plan" (ready=1).
+  if (programme && areas.length > 0 && ready) {
     return <GeneratePlanForm areaCount={areas.length} />;
   }
 

@@ -42,7 +42,7 @@ export async function saveAreaSelection(_prev: SetupState, formData: FormData): 
   if (active.length === 0) return { error: 'Pick at least one area to reset.' };
 
   revalidatePath('/app/setup');
-  return { error: null };
+  redirect('/app/setup?ready=1');
 }
 
 export async function addCustomAreaAction(_prev: SetupState, formData: FormData): Promise<SetupState> {
