@@ -4,5 +4,6 @@ import { createServerSupabase } from '@/lib/supabase/server';
 export async function POST(request: NextRequest) {
   const supabase = await createServerSupabase();
   await supabase.auth.signOut();
-  return NextResponse.redirect(new URL('/', request.url), { status: 303 });
+  const dest = new URL('/', request.nextUrl.origin);
+  return NextResponse.redirect(dest, { status: 303 });
 }

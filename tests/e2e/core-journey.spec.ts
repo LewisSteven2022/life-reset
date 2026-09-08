@@ -115,14 +115,16 @@ async function signUp(page: Page) {
 
 async function completeToday(page: Page) {
   await page.goto('/app');
+  const pending = page.locator('[data-habit-checkin]:not([aria-pressed="true"])');
   for (let guard = 0; guard < 12; guard += 1) {
-    const pending = page.locator('[data-habit-checkin]:not([aria-pressed="true"])');
-    if ((await pending.count()) === 0) break;
+    const left = await pending.count();
+    if (left === 0) break;
     await pending.first().click();
-    await expect(page.locator('[data-habit-checkin][aria-pressed="true"]').first()).toBeVisible();
-    await page.reload();
+    await expect.poll(async () => pending.count(), { timeout: 10_000 }).toBeLessThan(left);
+    await page.waitForTimeout(400);
   }
-  await expect(page.locator('[data-habit-checkin]:not([aria-pressed="true"])')).toHaveCount(0);
+  await page.reload();
+  await expect(pending).toHaveCount(0);
   if ((await page.locator('[data-habit-checkin]').count()) > 0) {
     await expect(page.getByText(/All of it|The lot of them/i)).toBeVisible();
   }
@@ -254,7 +256,7 @@ test.describe('core journey', () => {
     await expect(page.getByText(email)).toBeVisible();
 
     await page.getByRole('button', { name: 'Sign out' }).click();
-    await page.waitForURL('/');
+    await page.waitForURL((url) => pathOf(url) === '/');
     await signIn(page);
     await expect(page.getByText(/Day \d+ of 21/)).toBeVisible();
     await shot(page, 'journey-08-persisted');
