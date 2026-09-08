@@ -115,20 +115,16 @@ async function signUp(page: Page) {
 
 async function completeToday(page: Page) {
   await page.goto('/app');
-  const habits = page.locator('[data-habit-checkin]');
-  const count = await habits.count();
-  for (let i = 0; i < count; i += 1) {
-    const button = habits.nth(i);
-    if ((await button.getAttribute('aria-pressed')) === 'true') continue;
-    await button.click();
-    await expect(button).toHaveAttribute('aria-pressed', 'true');
+  for (let guard = 0; guard < 12; guard += 1) {
+    const pending = page.locator('[data-habit-checkin]:not([aria-pressed="true"])');
+    if ((await pending.count()) === 0) break;
+    await pending.first().click();
+    await expect(page.locator('[data-habit-checkin][aria-pressed="true"]').first()).toBeVisible();
+    await page.reload();
   }
-  if (count > 0) {
-    const done = page.getByText(/All of it|The lot of them/i);
-    if (!(await done.isVisible().catch(() => false))) {
-      await page.reload();
-    }
-    await expect(done).toBeVisible();
+  await expect(page.locator('[data-habit-checkin]:not([aria-pressed="true"])')).toHaveCount(0);
+  if ((await page.locator('[data-habit-checkin]').count()) > 0) {
+    await expect(page.getByText(/All of it|The lot of them/i)).toBeVisible();
   }
 }
 
