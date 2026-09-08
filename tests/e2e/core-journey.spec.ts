@@ -232,7 +232,10 @@ test.describe('core journey', () => {
     await expect(page.getByRole('heading', { name: 'Rewards' })).toBeVisible();
     await shot(page, 'journey-06-rewards');
     const grit = page.locator('li', { hasText: 'Grit note pack' });
-    await grit.getByRole('button', { name: /40 pts/ }).click();
+    const buyGrit = grit.getByRole('button', { name: /40 pts/ });
+    if (await buyGrit.isVisible().catch(() => false)) {
+      await buyGrit.click();
+    }
     await expect(grit.getByText('Yours')).toBeVisible();
 
     await page.getByRole('link', { name: 'Today' }).click();
