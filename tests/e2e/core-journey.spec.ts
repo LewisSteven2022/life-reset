@@ -14,7 +14,7 @@ async function signUp(page: Page) {
 
 async function completeToday(page: Page) {
   await page.goto('/app');
-  const buttons = page.locator('ul li button');
+  const buttons = page.locator('ul li button[aria-pressed="false"]');
   const count = await buttons.count();
   for (let i = 0; i < count; i += 1) {
     const button = buttons.nth(i);
@@ -41,6 +41,12 @@ async function jumpDays(page: Page, extra: number) {
 test.describe.configure({ mode: 'serial' });
 
 test.describe('core journey', () => {
+  test.beforeEach(() => {
+    test.skip(
+      !process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+      'Needs NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY in .env.local',
+    );
+  });
   test('landing page loads', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('heading', { name: /Reset the parts of your life/i })).toBeVisible();

@@ -29,6 +29,7 @@ export function HabitItem({ habit, dayIndex }: { habit: TodayHabit; dayIndex: nu
     <li className={`rounded-2xl border p-4 ${optimisticDone ? 'border-stone-900 bg-white' : 'border-stone-200'}`}>
       <button
         type="button"
+        aria-pressed={optimisticDone}
         onClick={() => submit(!optimisticDone)}
         className="flex w-full items-start gap-3 text-left"
       >
