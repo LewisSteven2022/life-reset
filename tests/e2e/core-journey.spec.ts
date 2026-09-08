@@ -137,7 +137,7 @@ async function jumpDays(page: Page, extra: number) {
     data: { offset: current + extra },
   });
   expect(res.ok()).toBeTruthy();
-  await page.reload();
+  await page.goto('/app');
 }
 
 test.describe.configure({ mode: 'serial' });
