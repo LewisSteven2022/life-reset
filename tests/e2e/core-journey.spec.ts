@@ -115,7 +115,7 @@ async function signUp(page: Page) {
 
 async function completeToday(page: Page) {
   await page.goto('/app');
-  const habits = page.locator('main ul li button[aria-pressed], div ul li button[aria-pressed]');
+  const habits = page.locator('[data-habit-checkin]');
   const count = await habits.count();
   for (let i = 0; i < count; i += 1) {
     const button = habits.nth(i);
