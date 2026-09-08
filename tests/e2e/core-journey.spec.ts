@@ -1,33 +1,50 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { config as loadEnv } from 'dotenv';
 import { test, expect, type Page } from '@playwright/test';
+import { allocateInbox, waitForConfirmLink, type Inbox } from './inbox';
 
 loadEnv({ path: '.env.local' });
 
 const password = process.env.PLAYWRIGHT_TEST_PASSWORD || 'Reset-journey-2475!';
 const SCREENSHOT_DIR = '/opt/cursor/artifacts/screenshots';
 
-/**
- * Hosted GoTrue rejects plus-addressing on example.com ("email is invalid").
- * Spec asked for playwright.reset+<timestamp>@example.com; the working local-part
- * is the same uniqueness with a dot instead of a plus.
- */
-function uniqueEmail() {
-  const fromEnv = process.env.PLAYWRIGHT_TEST_EMAIL?.trim();
-  if (fromEnv) return fromEnv;
-  return `playwright.reset.${Date.now()}@example.com`;
-}
-
-let email = uniqueEmail();
+let email = '';
 
 async function shot(page: Page, name: string) {
   mkdirSync(SCREENSHOT_DIR, { recursive: true });
   await page.screenshot({ path: `${SCREENSHOT_DIR}/${name}.png`, fullPage: true });
 }
 
+async function signIn(page: Page) {
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(email);
+  await page.getByLabel('Password').fill(password);
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.waitForURL(/\/app(\/setup)?\/?$/);
+}
+
+async function confirmFromInbox(page: Page, inbox: Inbox) {
+  const link = await waitForConfirmLink(inbox);
+  if (!link) {
+    throw new Error(
+      `No confirmation email for ${inbox.email}. Confirm email may still be ON, and the mailer did not deliver.`,
+    );
+  }
+  await page.goto(link);
+  await signIn(page);
+}
+
 async function signUp(page: Page) {
+  const fromEnv = process.env.PLAYWRIGHT_TEST_EMAIL?.trim();
+  let inbox: Inbox | null = null;
+  if (fromEnv) {
+    email = fromEnv;
+  } else {
+    inbox = await allocateInbox();
+    email = inbox.email;
+  }
+
   for (let attempt = 0; attempt < 10; attempt += 1) {
-    email = uniqueEmail();
     await page.goto('/signup');
     await page.getByLabel('Email').fill(email);
     await expect(page.getByLabel('Email')).toHaveValue(email);
@@ -46,9 +63,19 @@ async function signUp(page: Page) {
       return;
     }
     if (outcome === 'unconfirmed') {
-      throw new Error(
-        `Sign up for ${email} reached /login — Confirm email is still ON. Disable it in the Auth dashboard.`,
-      );
+      if (!inbox) {
+        throw new Error(
+          `Sign up for ${email} reached /login — Confirm email is still ON and no inbox is available to confirm it.`,
+        );
+      }
+      await confirmFromInbox(page, inbox);
+      writeFileSync('/tmp/life-reset-qa-email.txt', email);
+      return;
+    }
+    if (typeof outcome === 'string' && /already registered|already been registered/i.test(outcome)) {
+      await signIn(page);
+      writeFileSync('/tmp/life-reset-qa-email.txt', email);
+      return;
     }
     if (typeof outcome === 'string' && /rate limit/i.test(outcome)) {
       const waitMs = Math.min(120_000, 30_000 * (attempt + 1));
@@ -198,11 +225,7 @@ test.describe('core journey', () => {
 
     await page.getByRole('button', { name: 'Sign out' }).click();
     await page.waitForURL('/');
-    await page.goto('/login');
-    await page.getByLabel('Email').fill(email);
-    await page.getByLabel('Password').fill(password);
-    await page.getByRole('button', { name: 'Sign in' }).click();
-    await page.waitForURL(/\/app/);
+    await signIn(page);
     await expect(page.getByText(/Day \d+ of 21/)).toBeVisible();
     await shot(page, 'journey-08-persisted');
   });
