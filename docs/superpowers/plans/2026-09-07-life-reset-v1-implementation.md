@@ -37,7 +37,7 @@ These apply to every task. Values are taken from `docs/superpowers/specs/2026-09
 
 ## Fixed Values Decided In This Plan
 
-The spec deferred these to the implementation plan. They are now fixed. Anything still genuinely open is listed in **Open Decisions** at the very end.
+The spec deferred these to the implementation plan. They are now fixed. The ten items in **Open Decisions** were resolved on 2026-09-08 (accepted defaults; decision 6 upgraded so owned rewards change the UI).
 
 **Award amounts** (satisfies the required ordering):
 
@@ -140,10 +140,11 @@ life-reset/
 │   │   │   └── progress.ts
 │   │   ├── auth.ts                    # requireUser()
 │   │   ├── qa.ts                      # isQaEnabled(), getQaDayOffset()
+│   │   ├── appearance.ts              # owned unlocks → active theme + coach pack
 │   │   └── db.types.ts                # generated Supabase types
-│   └── content/coach.ts               # coach microcopy
+│   └── content/coach.ts               # coach microcopy (default / grit / calm packs)
 ├── tests/
-│   ├── unit/{plan,streak,awards,levels,day,schedule,qa}.test.ts
+│   ├── unit/{plan,streak,awards,levels,day,schedule,qa,appearance}.test.ts
 │   ├── integration/{rls.test.ts,auth-gate.test.ts}
 │   └── helpers/{supabase-admin.ts,server.ts}
 ├── proxy.ts                           # Next.js 16 request proxy (session refresh)
@@ -175,28 +176,30 @@ life-reset/
 **Interfaces:**
 - Produces: an installable, buildable Next.js app; `npm run dev`, `npm run build`, `npm run test` all work. Path alias `@/*` → `src/*`.
 
-- [ ] **Step 1: Scaffold the app into the existing repo**
+- [x] **Step 1: Scaffold the app into the existing repo**
 
 Run from the repo root. `create-next-app` refuses a non-empty directory, so scaffold into a temp dir and move the files in.
 
 ```bash
 cd /Users/steve/Projects/life-reset
-npx create-next-app@16.3.4 .tmp-scaffold \
+npx create-next-app@16.3.4 tmp-scaffold \
   --ts --tailwind --eslint --app --src-dir --turbopack \
   --import-alias "@/*" --use-npm --yes
-rsync -a --exclude .git --exclude node_modules .tmp-scaffold/ ./
-rm -rf .tmp-scaffold
+rsync -a --exclude .git --exclude node_modules tmp-scaffold/ ./
+rm -rf tmp-scaffold
 npm install
 ```
 
-- [ ] **Step 2: Pin exact versions and add test tooling**
+`create-next-app` rejects a directory whose name starts with a period (`npm` naming rules), so use `tmp-scaffold` rather than `.tmp-scaffold`. After pinning, also install `@types/node@22` — Vitest 5.0.0's optional peer is `@types/node@^22`, and the create-next-app scaffold ships `^20`. Pin `tailwindcss@4.3.3` and `@tailwindcss/postcss@4.3.3` to match the stack.
+
+- [x] **Step 2: Pin exact versions and add test tooling**
 
 ```bash
 npm install --save-exact next@16.3.4 react@19.2.0 react-dom@19.2.0
 npm install --save-exact --save-dev vitest@5.0.0 @vitejs/plugin-react@5.0.4 jsdom@28.0.0
 ```
 
-- [ ] **Step 3: Add Vitest config**
+- [x] **Step 3: Add Vitest config**
 
 Create `vitest.config.ts`:
 
@@ -233,7 +236,7 @@ Add scripts to `package.json`:
 }
 ```
 
-- [ ] **Step 4: Write a smoke test**
+- [x] **Step 4: Write a smoke test**
 
 Create `tests/unit/smoke.test.ts`:
 
@@ -248,12 +251,12 @@ describe('coach copy', () => {
 });
 ```
 
-- [ ] **Step 5: Run the test to verify it fails**
+- [x] **Step 5: Run the test to verify it fails**
 
 Run: `npm test`
 Expected: FAIL — `Failed to resolve import "@/content/coach"`.
 
-- [ ] **Step 6: Add coach copy module**
+- [x] **Step 6: Add coach copy module**
 
 Create `src/content/coach.ts`:
 
@@ -277,12 +280,12 @@ export function coachLineForMiss(): string {
 }
 ```
 
-- [ ] **Step 7: Run the test to verify it passes**
+- [x] **Step 7: Run the test to verify it passes**
 
 Run: `npm test`
 Expected: PASS, 1 test.
 
-- [ ] **Step 8: Build the landing page**
+- [x] **Step 8: Build the landing page**
 
 Replace `src/app/page.tsx`:
 
@@ -336,7 +339,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 }
 ```
 
-- [ ] **Step 9: Verify the app builds and renders**
+- [x] **Step 9: Verify the app builds and renders**
 
 Run: `npm run build && npm run typecheck && npm run lint`
 Expected: build succeeds, no type errors, no lint errors.
@@ -344,7 +347,7 @@ Expected: build succeeds, no type errors, no lint errors.
 Run: `npm run dev`, open `http://localhost:3000`.
 Expected: landing page with headline, one primary CTA, one secondary sign-in link. No gradients, no cards.
 
-- [ ] **Step 10: Commit**
+- [x] **Step 10: Commit**
 
 ```bash
 git add -A
@@ -4586,17 +4589,25 @@ git commit -m "feat(reflect): add weekly reflections on days 7, 14 and 21"
 
 # Phase 7 — Rewards, Plan, Areas, Account
 
-## Task 18: Reward redemption RPC and Rewards screen
+## Task 18: Reward redemption RPC, Rewards screen, and owned-unlock rendering
 
 **Files:**
 - Create: `supabase/migrations/<ts>_redeem_reward.sql`
 - Create: `src/lib/data/rewards.ts`
+- Create: `src/lib/appearance.ts`
 - Create: `src/app/app/rewards/page.tsx`, `src/app/app/rewards/actions.ts`
 - Create: `tests/integration/rewards.test.ts`
+- Create: `tests/unit/appearance.test.ts`
+- Modify: `src/content/coach.ts` — optional pack argument on existing helpers
+- Modify: `src/app/globals.css` — `[data-theme='dawn']` and `[data-theme='deep']` token overrides
+- Modify: `src/app/app/layout.tsx` — apply the owned theme
+- Modify: `src/app/app/page.tsx` — pass the owned coach pack into `coachLineForDay` / `coachLineForMiss`
 
 **Interfaces:**
 - Produces: SQL function `public.redeem_reward(p_reward_key text) returns public.progress`.
 - Produces: `listRewardsWithOwnership(): Promise<RewardWithOwnership[]>` where `RewardWithOwnership = RewardRow & { owned: boolean; affordable: boolean }`; `redeemReward(prev, formData)`.
+- Produces: `appearanceFromUnlocks(unlocks): { theme: 'default' | 'dawn' | 'deep'; coachPack: 'default' | 'grit' | 'calm' }`. If several unlocks of the same type are owned, the most recently unlocked (`unlocked_at`) of that type is active. Owning nothing keeps the default sage tokens and default coach copy.
+- Owning a theme **must** change the authenticated UI (CSS custom properties on a `data-theme` wrapper). Owning a coach-note pack **must** change the copy returned by the coach helpers. The finisher badge is still an account mark (shown in Task 19); it does not have to restyle the app.
 
 - [ ] **Step 1: Write the failing double-spend test**
 
@@ -4883,11 +4894,89 @@ export function RewardList({ rewards }: { rewards: RewardWithOwnership[] }) {
 }
 ```
 
-- [ ] **Step 6: Commit**
+- [ ] **Step 6: Wire owned unlocks into rendering**
+
+Purchase without a visible change is not done. Themes and coach-note packs must take effect in the authenticated UI.
+
+Create `tests/unit/appearance.test.ts` and watch it fail, then create `src/lib/appearance.ts`:
+
+```ts
+import { describe, it, expect } from 'vitest';
+import { appearanceFromUnlocks, type UnlockRecord } from '@/lib/appearance';
+
+function unlock(rewardKey: string, unlockedAt: string): UnlockRecord {
+  return { rewardKey, unlockedAt };
+}
+
+describe('appearanceFromUnlocks', () => {
+  it('keeps defaults when nothing is owned', () => {
+    expect(appearanceFromUnlocks([])).toEqual({ theme: 'default', coachPack: 'default' });
+  });
+
+  it('applies an owned theme and pack', () => {
+    expect(
+      appearanceFromUnlocks([
+        unlock('theme_dawn', '2026-09-01T00:00:00Z'),
+        unlock('coach_pack_grit', '2026-09-01T00:00:00Z'),
+        unlock('badge_finisher', '2026-09-01T00:00:00Z'),
+      ]),
+    ).toEqual({ theme: 'dawn', coachPack: 'grit' });
+  });
+
+  it('uses the most recently unlocked item of each type', () => {
+    expect(
+      appearanceFromUnlocks([
+        unlock('theme_dawn', '2026-09-01T00:00:00Z'),
+        unlock('theme_deep', '2026-09-08T00:00:00Z'),
+        unlock('coach_pack_grit', '2026-09-08T00:00:00Z'),
+        unlock('coach_pack_calm', '2026-09-01T00:00:00Z'),
+      ]),
+    ).toEqual({ theme: 'deep', coachPack: 'grit' });
+  });
+});
+```
+
+```ts
+export type UnlockRecord = { rewardKey: string; unlockedAt: string };
+export type AppTheme = 'default' | 'dawn' | 'deep';
+export type CoachPack = 'default' | 'grit' | 'calm';
+export type Appearance = { theme: AppTheme; coachPack: CoachPack };
+
+const THEMES: Record<string, AppTheme> = { theme_dawn: 'dawn', theme_deep: 'deep' };
+const PACKS: Record<string, CoachPack> = { coach_pack_grit: 'grit', coach_pack_calm: 'calm' };
+
+function latest(unlocks: UnlockRecord[], map: Record<string, string>): string | undefined {
+  const matches = unlocks
+    .filter((u) => u.rewardKey in map)
+    .sort((a, b) => a.unlockedAt.localeCompare(b.unlockedAt));
+  return matches.length === 0 ? undefined : matches[matches.length - 1].rewardKey;
+}
+
+export function appearanceFromUnlocks(unlocks: UnlockRecord[]): Appearance {
+  const themeKey = latest(unlocks, THEMES);
+  const packKey = latest(unlocks, PACKS);
+  return {
+    theme: themeKey ? THEMES[themeKey] : 'default',
+    coachPack: packKey ? PACKS[packKey] : 'default',
+  };
+}
+```
+
+Then:
+1. Add an optional `pack: CoachPack = 'default'` argument to `coachLineForSetup`, `coachLineForDay`, and `coachLineForMiss`. Keep today's default strings unchanged so existing tests stay green. Add grit and calm variants of the same four day-states (blunter vs gentler, still never shaming).
+2. Load the user's `unlock` rows in `src/app/app/layout.tsx`, call `appearanceFromUnlocks`, and set `data-theme={appearance.theme}` on the authenticated shell wrapper.
+3. In `src/app/globals.css`, add `[data-theme='dawn']` and `[data-theme='deep']` blocks that override the same CSS custom properties the default tokens use (paper, mist, ink, quiet). Dawn is a warm light palette; Deep is a low-light evening palette. Do not introduce a third layout.
+4. Pass `appearance.coachPack` into `coachLineForDay` / `coachLineForMiss` on Today (Task 15's page). Extend `listRewardsWithOwnership` or add a small `listUnlocks()` helper in `src/lib/data/rewards.ts` so the layout does not query ad hoc.
+5. `redeemReward` already revalidates `/app` and `/app/rewards`; after a theme or pack purchase the next render must show the new look or copy. Add a unit test that grit copy differs from default copy for the same day state.
+
+Run: `npm test`
+Expected: appearance tests plus existing unit tests PASS.
+
+- [ ] **Step 7: Commit**
 
 ```bash
 git add -A
-git commit -m "feat(rewards): add atomic reward redemption and the Rewards sheet"
+git commit -m "feat(rewards): add atomic redemption and apply owned themes and coach packs"
 ```
 
 ---
@@ -5821,7 +5910,7 @@ Expected: no `rls_disabled_in_public` and no `security_definer_view` findings. F
 
 - [ ] **Step 3: Configure auth settings**
 
-In the Supabase dashboard under Authentication → URL Configuration, set the Site URL to the Vercel production domain and add `https://<domain>/**` to Redirect URLs. Under Providers, confirm Email is enabled with password sign-in. Decide on email confirmation (see Open Decisions).
+In the Supabase dashboard under Authentication → URL Configuration, set the Site URL to the Vercel production domain and add `https://<domain>/**` to Redirect URLs. Under Providers, confirm Email is enabled with password sign-in. Decide on email confirmation (see Open Decisions — v1 default is confirmation off).
 
 - [ ] **Step 4: Deploy**
 
@@ -5883,7 +5972,7 @@ Run this end-to-end after Task 23, with `LIFE_RESET_QA_MODE=1` locally.
 4. **Shield consume.** Fast-forward +1 day, tick nothing, fast-forward +1 again. Expected: streak value preserved, `shield_count` back to 0.
 5. **Streak reset.** Miss a second day with no shield. Expected: streak drops to 0, XP unchanged.
 6. **Reflection.** Fast-forward to day 7. Save an empty reflection → +50 XP, +15 pts. Save again → no change. Re-open and add text → text persists, still no extra XP.
-7. **Rewards spend.** Buy `coach_pack_grit`. Balance drops by 40, XP unchanged, item shows "Yours", buying again is refused.
+7. **Rewards spend.** Buy `coach_pack_grit`. Balance drops by 40, XP unchanged, item shows "Yours", buying again is refused. Today’s coach line uses the grit pack (copy is blunter than the default). Buy `theme_dawn`. The authenticated shell switches to the dawn palette; the public landing page is unchanged.
 8. **Mid-programme edit.** Drop a habit on day 9. Days 1–8 keep their check-ins; day 9 onward has one fewer scheduled habit; the streak does not change retroactively.
 9. **Abandon and restart.** Abandon on day 10, start a new cycle. Old check-ins and reflections still exist in the database; XP carried over; streak restarted at 0.
 10. **Completion.** Fast-forward past day 21. Expected: redirect to `/app/complete` with the summary, and `programme.status` is `completed`.
@@ -5901,7 +5990,7 @@ Run this end-to-end after Task 23, with `LIFE_RESET_QA_MODE=1` locally.
 | 5 Streak day rule | Tasks 10, 15 |
 | 6 XP, levels | Tasks 7, 11, 16 |
 | 6 Streak + shield | Task 10 |
-| 6 Reset points and cosmetic-only spending | Tasks 7, 18 |
+| 6 Reset points and cosmetic-only spending | Tasks 7, 18 (purchase **and** applying owned themes / coach packs in the UI) |
 | 7 Stack, app shape, server-side data access, RLS | Tasks 1, 4, 5, 12 |
 | 7 Plan generation from catalogue | Tasks 2, 9, 14 |
 | 8 Data model (all 10 entities) | Tasks 2, 3 |
@@ -5917,46 +6006,56 @@ Run this end-to-end after Task 23, with `LIFE_RESET_QA_MODE=1` locally.
 
 ## Open Decisions
 
-These need a call from you before or during implementation. Each has a recommended default — saying "go with your defaults" is a complete answer.
+**Resolved 2026-09-08.** All ten recommended defaults are accepted. Decision 6 is upgraded: owned themes and coach-note packs must change what the user sees, not only what they own. Decision 9 stays at the v1 default (owner-writable `progress` under RLS) with the documented hardening path intact.
 
 1. **Product display name.**
    The spec leaves this open (Life Reset, Twenty-One, Reset Coach).
    **Recommended default: "Life Reset".** It matches the repo name, describes the product plainly, and costs nothing to change later since it only appears in `src/app/layout.tsx` metadata and the landing headline.
+   **Resolved 2026-09-08: accepted.** Display name is "Life Reset".
 
 2. **Auth method: magic link vs email + password.**
    This plan is written for **email + password**.
    **Recommended default: keep email + password.** It works offline-free in local development, needs no email deliverability setup, and lets the integration tests sign users in programmatically. Magic links would require configuring an SMTP provider before you could test signup at all. Switching later touches only `src/app/login/actions.ts` and `src/app/signup/actions.ts`.
+   **Resolved 2026-09-08: accepted.** Email + password.
 
 3. **Email confirmation on sign-up.**
    **Recommended default: turn confirmation OFF** in the Supabase dashboard for v1. This is a private app for one person; requiring a confirmation click adds an SMTP dependency for no security gain. Turn it on if you ever share the URL.
+   **Resolved 2026-09-08: accepted.** Confirmation off for v1.
 
 4. **Where content lives: code/JSON vs DB seed.**
    This plan seeds the catalogue via **idempotent SQL migrations** (Task 4).
    **Recommended default: keep the SQL seed.** `on conflict do update` makes it re-runnable, `supabase db reset` reproduces it exactly, and plan generation still takes templates as a parameter so unit tests never touch the database. The alternative — TypeScript content modules plus a seeding script — adds a service-role key dependency and a second source of truth for no benefit at this scale.
+   **Resolved 2026-09-08: accepted.** SQL seed.
 
 5. **Exact XP and reset-point amounts.**
    This plan fixes 10/2, 25/5 and 50/15 (see Fixed Values).
    **Recommended default: go with these.** They preserve the required ordering, reach level 7 only on a near-perfect cycle, and make the 390-point reward catalogue take roughly two cycles to complete. All five numbers live in one object in `src/lib/domain/constants.ts` if you want to tune them.
+   **Resolved 2026-09-08: accepted.** 10/2, 25/5, 50/15.
 
 6. **Reward catalogue contents.**
    This plan ships two coach note packs, two themes and one finisher badge.
-   **Recommended default: go with these five.** Two themes and two note packs give a real choice without building a shop; the badge is the long-term goal. Note that Task 18 makes rewards *purchasable and owned* but does not make the themes or note packs actually change the UI — wiring `unlock` rows into the rendered theme and coach copy is deliberately left as a small follow-up so v1 ships. Say if you want that folded into Task 18 instead.
+   **Recommended default: go with these five.** Two themes and two note packs give a real choice without building a shop; the badge is the long-term goal.
+   **Resolved 2026-09-08: accepted, with an upgrade.** Keep the five-item catalogue. Task 18 must also **wire owned unlocks into rendering**: an owned theme changes the authenticated palette (`data-theme` + CSS tokens); an owned coach-note pack changes coach copy. Most recently unlocked item of each type wins. Purchase/ownership alone is not enough for v1. The finisher badge remains an account mark (Task 19).
 
 7. **Streak shield visibility.**
    The status row currently shows "shielded" as plain text next to the streak.
    **Recommended default: keep it as text.** An icon reads as a second game UI, which the spec's UX rules argue against. Easy to swap later in `src/components/status-row.tsx`.
+   **Resolved 2026-09-08: accepted.** Plain text "shielded".
 
 8. **Start date: today vs tomorrow.**
    `confirmStart` sets `start_date` to today, so Day 1 begins immediately.
    **Recommended default: start today.** Momentum matters more than a clean midnight boundary, and a partial day 1 only affects that one day's streak qualification. If you would rather Day 1 began tomorrow, that is a one-line change in `confirmStart`.
+   **Resolved 2026-09-08: accepted.** Start today.
 
 9. **Whether `progress` stays owner-writable under RLS.**
    Currently a user can update their own `progress` row directly, which means XP could be forged by hand-crafting a request.
    **Recommended default: accept it for v1.** This is a private single-user app with no adversary. The hardening path is documented: move the three `progress` writes into `SECURITY DEFINER` RPCs alongside `redeem_reward` and drop the `progress_update` policy.
+   **Resolved 2026-09-08: accepted at the v1 default.** Owner-writable `progress` stays. Hardening path unchanged: move the three `progress` writes behind `SECURITY DEFINER` RPCs and drop `progress_update` when (if) this is no longer a single-user app.
 
 10. **Timezone changes mid-programme.**
     `programme.timezone` is captured once at setup and never updated.
     **Recommended default: leave it fixed.** A user who travels keeps their original day boundaries, which is the least surprising behaviour for a 21-day count. Re-reading the browser timezone on every load would let a flight silently skip or repeat a day.
+    **Resolved 2026-09-08: accepted.** Timezone stays fixed at setup.
 
 ---
 
