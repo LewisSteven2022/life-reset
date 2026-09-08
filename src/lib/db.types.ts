@@ -530,7 +530,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      redeem_reward: {
+        Args: { p_reward_key: string }
+        Returns: Database["public"]["Tables"]["progress"]["Row"]
+      }
     }
     Enums: {
       [_ in never]: never
