@@ -21,6 +21,13 @@ LIFE_RESET_QA_MODE=1
 
 Auth dashboard settings for v1: **Email + password**, **Confirm email: OFF**.
 
+If those are not already set on project `clxotyxqmfvetqkdgzbe`:
+
+1. Open [Authentication → Providers → Email](https://supabase.com/dashboard/project/clxotyxqmfvetqkdgzbe/auth/providers)
+2. Enable Email
+3. Turn **Confirm email** off
+4. Open the [SQL editor](https://supabase.com/dashboard/project/clxotyxqmfvetqkdgzbe/sql/new) and run `supabase/migrations/20260908072000_redeem_reward.sql` once so Rewards spend works
+
 ```bash
 npm run dev
 ```
